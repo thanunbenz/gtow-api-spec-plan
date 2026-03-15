@@ -19,15 +19,15 @@ examples/
 
 | Endpoint | Method | Status |
 |----------|--------|--------|
-| `/v4/solutions/spot-solution/` | GET | Documented |
+| `/{version}/solutions/spot-solution/` | GET | Documented |
 
 ## Quick Reference
 
-**Base URL:** `https://api.gtowizard.com`
+**Base URL:** `https://api.{DOMAIN}.com`
 
 **Example query:**
 ```
-GET /v4/solutions/spot-solution/?gametype=MTTGeneral&depth=20.125&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=&turn_actions=&river_actions=&board=AcTd6h
+GET /{version}/solutions/spot-solution/?gametype=MTTGeneral&depth=20.125&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=&turn_actions=&river_actions=&board=AcTd6h
 ```
 
 Returns GTO strategy for all 1326 hand combinations at a given decision node, including:

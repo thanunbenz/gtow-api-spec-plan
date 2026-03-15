@@ -3,7 +3,7 @@
 ## Endpoint
 
 ```
-GET https://api.gtowizard.com/v4/solutions/spot-solution/
+GET https://api.{DOMAIN}.com/{version}/solutions/spot-solution/
 ```
 
 ## Authentication
@@ -364,7 +364,7 @@ Hands containing board cards have `0.0` in all arrays (strategy, EVs, range). Fo
 ### Request
 
 ```
-GET /v4/solutions/spot-solution/?gametype=MTTGeneral&depth=20.125&stacks=&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=&turn_actions=&river_actions=&board=AcTd6h
+GET /{version}/solutions/spot-solution/?gametype=MTTGeneral&depth=20.125&stacks=&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=&turn_actions=&river_actions=&board=AcTd6h
 ```
 
 **Scenario:** 8-handed MTT, 20bb effective. BTN opens to 2bb, BB calls. Flop is Ac Td 6h. BB (OOP) is first to act.
