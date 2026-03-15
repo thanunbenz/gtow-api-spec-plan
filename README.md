@@ -107,7 +107,15 @@ npx swagger-ui-watcher openapi.yaml
 npx @stoplight/prism-cli mock openapi.yaml --port 3000
 ```
 
-Example query:
+Example queries (auth headers required):
 ```bash
-curl "http://localhost:3000/v1/poker/next-actions?gametype=MTTGeneral&depth=20.125&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=X&board=AcTd6h"
+# Next Actions
+curl "http://localhost:3000/v1/poker/next-actions?gametype=MTTGeneral&depth=20.125&preflop_actions=F-F-F-F-F-R2-F-C&flop_actions=X&board=AcTd6h" \
+  -H "Authorization: Bearer test" \
+  -H "gwclientid: test"
+
+# Spot Solution
+curl "http://localhost:3000/v1/solutions/spot-solution?gametype=MTTGeneral&depth=20.125&preflop_actions=F-F-F-F-F-R2-F-C&board=AcTd6h" \
+  -H "Authorization: Bearer test" \
+  -H "gwclientid: test"
 ```
