@@ -1,0 +1,4 @@
+gametype=MTTGeneralV2
+depth=20.125
+stacks=20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125
+preflop_actions=F-R2-C-R5-F-RAI-F-F-F-F-F-F

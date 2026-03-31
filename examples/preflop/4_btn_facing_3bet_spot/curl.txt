@@ -1,0 +1,5 @@
+curl -X GET \
+  "https://api.{DOMAIN}.com/v4/solutions/spot-solution/?gametype=MTTGeneralV2&depth=20.125&stacks=20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125&preflop_actions=F-F-F-F-F-F-R2-F-R6&flop_actions=&turn_actions=&river_actions=&board=" \
+  -H "accept: application/json, text/plain, */*" \
+  -H "accept-encoding: gzip, deflate, br, zstd" \
+  -H "gwclientid: <REDACTED>"

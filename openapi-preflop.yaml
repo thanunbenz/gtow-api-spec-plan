@@ -1,0 +1,925 @@
+openapi: 3.0.3
+info:
+  title: GTO Wizard Preflop API
+  description: |
+    Reverse-engineered API specification for the GTO Wizard preflop solver.
+
+    Two endpoints power the preflop solution UI:
+    - **Spot Solution** (v4) — returns full GTO strategy data (strategy frequencies, EVs, ranges) for all 169 hand groups
+    - **Next Actions** (v1) — lightweight navigation endpoint returning available actions at the next decision node
+
+    ### Hand Group Indexing
+
+    All 169-element arrays use the standard 13×13 hand group matrix.
+    Rows and columns represent ranks in descending order: A, K, Q, J, T, 9, 8, 7, 6, 5, 4, 3, 2.
+
+    - **Diagonal** (row == col): Pocket pairs (AA, KK, QQ, …, 22)
+    - **Above diagonal** (col > row): Suited hands (AKs, AQs, …)
+    - **Below diagonal** (row > col): Offsuit hands (AKo, AQo, …)
+
+    ```
+         A    K    Q    J    T    9    8    7    6    5    4    3    2
+    A  [ 0]  [ 1]  [ 2]  [ 3]  [ 4]  [ 5]  [ 6]  [ 7]  [ 8]  [ 9] [10] [11] [12]
+    K  [13]  [14]  [15]  [16]  [17]  [18]  [19]  [20]  [21]  [22] [23] [24] [25]
+    Q  [26]  [27]  [28]  [29]  [30]  [31]  [32]  [33]  [34]  [35] [36] [37] [38]
+    J  [39]  [40]  [41]  [42]  [43]  [44]  [45]  [46]  [47]  [48] [49] [50] [51]
+    T  [52]  [53]  [54]  [55]  [56]  [57]  [58]  [59]  [60]  [61] [62] [63] [64]
+    9  [65]  [66]  [67]  [68]  [69]  [70]  [71]  [72]  [73]  [74] [75] [76] [77]
+    8  [78]  [79]  [80]  [81]  [82]  [83]  [84]  [85]  [86]  [87] [88] [89] [90]
+    7  [91]  [92]  [93]  [94]  [95]  [96]  [97]  [98]  [99] [100] [101] [102] [103]
+    6  [104] [105] [106] [107] [108] [109] [110] [111] [112] [113] [114] [115] [116]
+    5  [117] [118] [119] [120] [121] [122] [123] [124] [125] [126] [127] [128] [129]
+    4  [130] [131] [132] [133] [134] [135] [136] [137] [138] [139] [140] [141] [142]
+    3  [143] [144] [145] [146] [147] [148] [149] [150] [151] [152] [153] [154] [155]
+    2  [156] [157] [158] [159] [160] [161] [162] [163] [164] [165] [166] [167] [168]
+    ```
+
+    Index 0 = AA, index 1 = AKs, index 13 = AKo, index 14 = KK, index 168 = 22.
+
+    Unlike the postflop API (which uses 1326-element arrays for individual card combos),
+    preflop arrays are grouped by hand type since suit isomorphism applies preflop.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3001
+    description: Local development (preflop mock)
+
+security:
+  - bearerAuth: []
+    clientId: []
+
+tags:
+  - name: Solutions
+    description: Full GTO preflop strategy data
+  - name: Navigation
+    description: Lightweight preflop game tree navigation
+
+paths:
+  /v4/solutions/spot-solution:
+    get:
+      operationId: getPreflopSpotSolution
+      tags: [Solutions]
+      summary: Get GTO preflop strategy for a decision node
+      description: |
+        Returns the complete GTO preflop solution at a decision node including strategy frequencies,
+        expected values, and ranges for all 169 hand groups.
+
+        Response is ~68–122KB depending on the number of remaining players and available actions.
+
+        Key differences from the postflop spot-solution (v1):
+        - Arrays are **169 elements** (hand groups), not 1326 (card combos)
+        - `players_info` contains **1 player** (the active decision maker only)
+        - `game.players` contains **all 9 seats** at the table
+        - `hand_categories_range`, `draw_categories_range`, `blocker_rate`, `unblocker_rate` are always empty arrays
+        - `blockers_frequencies` is always null
+        - `board` is always an empty string
+      parameters:
+        - $ref: '#/components/parameters/gametype'
+        - $ref: '#/components/parameters/depth'
+        - $ref: '#/components/parameters/stacks'
+        - $ref: '#/components/parameters/preflop_actions'
+      responses:
+        '200':
+          description: GTO preflop strategy solution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflopSpotSolutionResponse'
+              example:
+                action_solutions:
+                  - action:
+                      code: "F"
+                      position: "UTG+2"
+                      type: "FOLD"
+                      betsize: "0"
+                      allin: false
+                      is_hand_end: false
+                      is_showdown: false
+                      next_street: false
+                      display_name: "FOLD"
+                      simple_group: "FOLD"
+                      advanced_group: "FOLD"
+                      betsize_by_pot: null
+                      next_position: "LJ"
+                    total_frequency: 0.803039
+                    total_ev: 0.20851745
+                    total_combos: 1064.83
+                    strategy: [1.0, 1.0, 1.0, 1.0, 1.0]
+                    evs: [0.0, 0.0, 0.0, 0.0, 0.0]
+                    hand_categories: []
+                    draw_categories: []
+                    equity_buckets: null
+                    equity_buckets_advanced: null
+                    tournament_evs_converter: null
+                  - action:
+                      code: "R2"
+                      position: "UTG+2"
+                      type: "RAISE"
+                      betsize: "2"
+                      allin: false
+                      is_hand_end: false
+                      is_showdown: false
+                      next_street: false
+                      display_name: "RAISE"
+                      simple_group: "RAISE"
+                      advanced_group: "BET_SMALL"
+                      betsize_by_pot: 0.2758620689655172
+                      next_position: "LJ"
+                    total_frequency: 0.196961
+                    total_ev: 0.20851745
+                    total_combos: 261.17
+                    strategy: [0.0, 0.0, 0.0, 0.0, 0.0]
+                    evs: [-0.19195, -0.52871, -0.35936, -0.12756, -0.49261]
+                    hand_categories: []
+                    draw_categories: []
+                    equity_buckets: null
+                    equity_buckets_advanced: null
+                    tournament_evs_converter: null
+                  - action:
+                      code: "RAI"
+                      position: "UTG+2"
+                      type: "RAISE"
+                      betsize: "20.000"
+                      allin: true
+                      is_hand_end: false
+                      is_showdown: false
+                      next_street: false
+                      display_name: "ALLIN"
+                      simple_group: "RAISE"
+                      advanced_group: "BET_OVERBET"
+                      betsize_by_pot: 5.241379310344828
+                      next_position: "LJ"
+                    total_frequency: 0.0
+                    total_ev: 0.20851745
+                    total_combos: 0.0
+                    strategy: [0.0, 0.0, 0.0, 0.0, 0.0]
+                    evs: [-0.40592, -2.3283, -1.61176, -0.29486, -2.25033]
+                    hand_categories: []
+                    draw_categories: []
+                    equity_buckets: null
+                    equity_buckets_advanced: null
+                    tournament_evs_converter: null
+                players_info:
+                  - player:
+                      relative_postflop_position: "OOP"
+                      hand: null
+                      is_dealer: false
+                      is_folded: false
+                      is_hero: true
+                      is_active: true
+                      stack: "20.125"
+                      current_stack: "20.000"
+                      chips_on_table: "0"
+                      bounty: null
+                      profile: null
+                      position: "UTG+2"
+                      bounty_in_bb: null
+                      name: "UTG+2"
+                      seat: 2
+                    range: [1.0, 1.0, 1.0, 1.0, 1.0]
+                hand_categories_range: []
+                draw_categories_range: []
+                blocker_rate: []
+                unblocker_rate: []
+                blockers_frequencies: null
+                game:
+                  players:
+                    - position: "UTG+2"
+                      relative_postflop_position: "OOP"
+                      hand: null
+                      is_dealer: false
+                      is_folded: false
+                      is_hero: true
+                      is_active: true
+                      stack: "20.125"
+                      current_stack: "20.000"
+                      chips_on_table: "0"
+                      bounty: null
+                      bounty_in_bb: null
+                      profile: null
+                    - position: "LJ"
+                      relative_postflop_position: "OOP"
+                      hand: null
+                      is_dealer: false
+                      is_folded: false
+                      is_hero: false
+                      is_active: false
+                      stack: "20.125"
+                      current_stack: "20.000"
+                      chips_on_table: "0"
+                      bounty: null
+                      bounty_in_bb: null
+                      profile: null
+                    - position: "SB"
+                      relative_postflop_position: "OOP"
+                      hand: null
+                      is_dealer: false
+                      is_folded: false
+                      is_hero: false
+                      is_active: false
+                      stack: "20.125"
+                      current_stack: "19.500"
+                      chips_on_table: "0.500"
+                      bounty: null
+                      bounty_in_bb: null
+                      profile: null
+                    - position: "BB"
+                      relative_postflop_position: "OOP"
+                      hand: null
+                      is_dealer: false
+                      is_folded: false
+                      is_hero: false
+                      is_active: false
+                      stack: "20.125"
+                      current_stack: "19.000"
+                      chips_on_table: "1.000"
+                      bounty: null
+                      bounty_in_bb: null
+                      profile: null
+                  current_street:
+                    type: "PREFLOP"
+                    start_pot: "2.625"
+                    end_pot: "2.625"
+                  pot: "2.625"
+                  pot_odds: 0.276
+                  active_position: "UTG+2"
+                  board: ""
+                  bet_display_name: "RAISE"
+                usage: null
+                warning: null
+                hands_locked: null
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Unauthorized — invalid or expired token
+        '404':
+          description: Solution not found
+
+  /v1/poker/next-actions:
+    get:
+      operationId: getPreflopNextActions
+      tags: [Navigation]
+      summary: Get available preflop actions at the next decision node
+      description: |
+        Lightweight endpoint returning available actions at the next preflop node.
+        No strategy arrays or EVs — just action metadata and game state.
+
+        Called when the user clicks an action to navigate forward in the preflop tree.
+
+        Unlike postflop, `future_actions` is always empty for preflop nodes
+        (no street transitions occur within the preflop tree).
+      parameters:
+        - $ref: '#/components/parameters/gametype'
+        - $ref: '#/components/parameters/depth'
+        - $ref: '#/components/parameters/stacks'
+        - $ref: '#/components/parameters/preflop_actions'
+      responses:
+        '200':
+          description: Available actions at the next preflop node
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreflopNextActionsResponse'
+              example:
+                next_actions:
+                  game:
+                    players:
+                      - position: "UTG+2"
+                        relative_postflop_position: "OOP"
+                        hand: null
+                        is_dealer: false
+                        is_folded: false
+                        is_hero: false
+                        is_active: false
+                        stack: "20.125"
+                        current_stack: "20.000"
+                        chips_on_table: "0.00"
+                        bounty: null
+                        bounty_in_bb: null
+                        profile: null
+                      - position: "BTN"
+                        relative_postflop_position: "IP"
+                        hand: null
+                        is_dealer: true
+                        is_folded: false
+                        is_hero: true
+                        is_active: true
+                        stack: "20.125"
+                        current_stack: "20.000"
+                        chips_on_table: "0.00"
+                        bounty: null
+                        bounty_in_bb: null
+                        profile: null
+                      - position: "SB"
+                        relative_postflop_position: "OOP"
+                        hand: null
+                        is_dealer: false
+                        is_folded: false
+                        is_hero: false
+                        is_active: false
+                        stack: "20.125"
+                        current_stack: "19.500"
+                        chips_on_table: "0.50"
+                        bounty: null
+                        bounty_in_bb: null
+                        profile: null
+                      - position: "BB"
+                        relative_postflop_position: "OOP"
+                        hand: null
+                        is_dealer: false
+                        is_folded: false
+                        is_hero: false
+                        is_active: false
+                        stack: "20.125"
+                        current_stack: "19.000"
+                        chips_on_table: "1.00"
+                        bounty: null
+                        bounty_in_bb: null
+                        profile: null
+                    current_street:
+                      type: "PREFLOP"
+                      start_pot: "2.625"
+                      end_pot: "2.625"
+                    pot: "2.625"
+                    pot_odds: 0.276
+                    active_position: "BTN"
+                    board: ""
+                    bet_display_name: "RAISE"
+                  available_actions:
+                    - action:
+                        code: "F"
+                        position: "BTN"
+                        type: "FOLD"
+                        betsize: "0.000"
+                        allin: false
+                        is_hand_end: false
+                        is_showdown: false
+                        next_street: false
+                        display_name: "FOLD"
+                        simple_group: "FOLD"
+                        advanced_group: "FOLD"
+                        betsize_by_pot: null
+                        next_position: "BB"
+                      frequency: null
+                      is_solution_end: false
+                      can_be_solved_by_ai: false
+                      next_position: "BB"
+                      selected: false
+                    - action:
+                        code: "C"
+                        position: "BTN"
+                        type: "CALL"
+                        betsize: "6.000"
+                        allin: false
+                        is_hand_end: false
+                        is_showdown: false
+                        next_street: false
+                        display_name: "CALL"
+                        simple_group: "CALL"
+                        advanced_group: "CALL"
+                        betsize_by_pot: null
+                        next_position: "BB"
+                      frequency: null
+                      is_solution_end: false
+                      can_be_solved_by_ai: false
+                      next_position: "BB"
+                      selected: false
+                    - action:
+                        code: "RAI"
+                        position: "BTN"
+                        type: "RAISE"
+                        betsize: "20.000"
+                        allin: true
+                        is_hand_end: false
+                        is_showdown: false
+                        next_street: false
+                        display_name: "ALLIN"
+                        simple_group: "RAISE"
+                        advanced_group: "BET_OVERBET"
+                        betsize_by_pot: null
+                        next_position: "BB"
+                      frequency: null
+                      is_solution_end: false
+                      can_be_solved_by_ai: false
+                      next_position: "BB"
+                      selected: false
+                  custom_solution_id: null
+                  is_node_locked: false
+                  is_edited: false
+                  is_editable: false
+                  forced_fold: false
+                  available_node_edits: null
+                  merged_actions: []
+                  preset_action_code: "F"
+                future_actions: []
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Unauthorized — invalid or expired token
+        '404':
+          description: Solution not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived access token (~15 min)
+    clientId:
+      type: apiKey
+      in: header
+      name: gwclientid
+      description: Client identifier (UUID)
+
+  parameters:
+    gametype:
+      name: gametype
+      in: query
+      required: true
+      description: "Game format identifier (e.g., MTTGeneralV2)"
+      schema:
+        type: string
+      example: MTTGeneralV2
+
+    depth:
+      name: depth
+      in: query
+      required: true
+      description: Starting stack depth in big blinds
+      schema:
+        type: string
+      example: "20.125"
+
+    stacks:
+      name: stacks
+      in: query
+      required: true
+      description: |
+        Stack sizes for all 9 seats, dash-separated.
+        Order: UTG, UTG+1, UTG+2, LJ, HJ, CO, BTN, SB, BB.
+      schema:
+        type: string
+      example: "20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125-20.125"
+
+    preflop_actions:
+      name: preflop_actions
+      in: query
+      required: false
+      allowEmptyValue: true
+      description: |
+        Preflop action sequence so far, dash-separated.
+        Each seat acts in order: UTG, UTG+1, UTG+2, LJ, HJ, CO, BTN, SB, BB.
+        Codes: F=Fold, C=Call, R{size}=Raise (e.g., R2=raise to 2bb), RAI=All-in.
+
+        Empty or omitted for the first decision (UTG to act).
+        Partial sequences represent in-progress preflop action.
+      schema:
+        type: string
+        default: ""
+      example: "F-F-F-F-F-F-R2"
+
+  schemas:
+    # ─── Spot Solution ───
+
+    PreflopSpotSolutionResponse:
+      type: object
+      required:
+        - action_solutions
+        - players_info
+        - hand_categories_range
+        - draw_categories_range
+        - blocker_rate
+        - unblocker_rate
+        - blockers_frequencies
+        - game
+      properties:
+        action_solutions:
+          type: array
+          description: Strategy data for each available action at this node
+          items:
+            $ref: '#/components/schemas/PreflopActionSolution'
+        players_info:
+          type: array
+          description: |
+            The active player with their range. Always 1 entry for preflop
+            (unlike postflop which returns 2 players).
+          items:
+            $ref: '#/components/schemas/PlayerInfo'
+        hand_categories_range:
+          type: array
+          description: "Always empty array for preflop (hand categories only apply postflop)."
+          items:
+            type: integer
+        draw_categories_range:
+          type: array
+          description: "Always empty array for preflop (draw categories only apply postflop)."
+          items:
+            type: integer
+        blocker_rate:
+          type: array
+          description: "Always empty array for preflop (blocker analysis only applies postflop)."
+          items:
+            type: number
+        unblocker_rate:
+          type: array
+          description: "Always empty array for preflop (unblocker analysis only applies postflop)."
+          items:
+            type: number
+        blockers_frequencies:
+          type: array
+          nullable: true
+          description: "Always null for preflop (blocker frequencies only apply postflop)."
+          items:
+            type: object
+        game:
+          $ref: '#/components/schemas/Game'
+        usage:
+          type: object
+          nullable: true
+          description: "Usage tracking data. Currently always null."
+        warning:
+          type: string
+          nullable: true
+          description: Warning message if applicable
+        hands_locked:
+          type: string
+          nullable: true
+          description: Paywall/access lock indicator
+
+    PreflopActionSolution:
+      type: object
+      required: [action, total_frequency, total_ev, total_combos, strategy, evs]
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionDef'
+        total_frequency:
+          type: number
+          format: double
+          description: "Weighted average frequency across all in-range hands [0.0, 1.0]"
+          minimum: 0
+          maximum: 1
+        total_ev:
+          type: number
+          format: double
+          description: "Overall expected value for the active player across all hands"
+        total_combos:
+          type: number
+          format: double
+          description: "Total number of hand combos that take this action"
+        strategy:
+          type: array
+          description: "Probability of taking this action for each hand group. Length: 169."
+          items:
+            type: number
+            format: double
+        evs:
+          type: array
+          description: "Expected value for each hand group. Length: 169. EV of 0.0 for FOLD."
+          items:
+            type: number
+            format: double
+        hand_categories:
+          type: array
+          description: "Always empty array for preflop."
+          items:
+            type: integer
+        draw_categories:
+          type: array
+          description: "Always empty array for preflop."
+          items:
+            type: integer
+        equity_buckets:
+          type: array
+          nullable: true
+          description: "Always null for preflop."
+          items:
+            type: number
+        equity_buckets_advanced:
+          type: array
+          nullable: true
+          description: "Always null for preflop."
+          items:
+            type: number
+        tournament_evs_converter:
+          type: object
+          nullable: true
+          description: "Always null for preflop."
+
+    # ─── Next Actions ───
+
+    PreflopNextActionsResponse:
+      type: object
+      required: [next_actions, future_actions]
+      properties:
+        next_actions:
+          $ref: '#/components/schemas/PreflopNextActionsNode'
+        future_actions:
+          type: array
+          description: |
+            Always empty for preflop. Street-transition lookahead only applies postflop
+            (when both players check and the game advances to the next street).
+          items:
+            $ref: '#/components/schemas/PreflopNextActionsNode'
+
+    PreflopNextActionsNode:
+      type: object
+      required:
+        - game
+        - available_actions
+        - is_node_locked
+        - is_edited
+        - is_editable
+        - forced_fold
+        - merged_actions
+      properties:
+        game:
+          $ref: '#/components/schemas/Game'
+        available_actions:
+          type: array
+          description: |
+            Actions available at this node. Empty array at terminal nodes
+            (e.g., everyone folds to a raise/all-in).
+          items:
+            $ref: '#/components/schemas/AvailableAction'
+        custom_solution_id:
+          type: string
+          nullable: true
+          description: Custom solution override ID
+        is_node_locked:
+          type: boolean
+          description: Whether this node is locked behind paywall
+        is_edited:
+          type: boolean
+          description: Whether this node has been manually edited
+        is_editable:
+          type: boolean
+          description: Whether this node can be edited by the user
+        forced_fold:
+          type: boolean
+          description: Whether a fold is forced at this node
+        available_node_edits:
+          type: object
+          nullable: true
+          description: Available node edit options
+        merged_actions:
+          type: array
+          description: List of action codes that have been merged
+          items:
+            type: string
+        preset_action_code:
+          type: string
+          nullable: true
+          description: "Default action hint for UI selection. null at terminal nodes."
+
+    AvailableAction:
+      type: object
+      required: [action, is_solution_end, can_be_solved_by_ai, next_position, selected]
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionDef'
+        frequency:
+          type: number
+          format: double
+          nullable: true
+          description: "Overall frequency. null in next-actions (only spot-solution provides this)."
+        is_solution_end:
+          type: boolean
+          description: Whether taking this action reaches a terminal node
+        can_be_solved_by_ai:
+          type: boolean
+          description: Whether AI solver is available for the resulting node
+        next_position:
+          type: string
+          description: Position of the next player to act
+        selected:
+          type: boolean
+          description: Whether this action is currently selected in the UI
+
+    # ─── Shared Schemas ───
+
+    ActionDef:
+      type: object
+      description: Action metadata shared between spot-solution and next-actions
+      required:
+        - code
+        - position
+        - type
+        - betsize
+        - allin
+        - is_hand_end
+        - is_showdown
+        - next_street
+        - display_name
+        - simple_group
+        - advanced_group
+        - next_position
+      properties:
+        code:
+          type: string
+          description: "Action code: F, C, R{size}, RAI"
+          example: "F"
+        position:
+          type: string
+          description: Position of the acting player
+          enum: [BB, SB, BTN, CO, HJ, LJ, UTG+2, UTG+1, UTG]
+          example: "UTG+2"
+        type:
+          type: string
+          description: Action type
+          enum: [FOLD, CALL, RAISE]
+          example: "FOLD"
+        betsize:
+          type: string
+          description: "Bet/raise size in big blinds. \"0\" for fold."
+          example: "0"
+        allin:
+          type: boolean
+          description: Whether this action is all-in
+        is_hand_end:
+          type: boolean
+          description: Whether this action ends the hand (e.g., all others fold)
+        is_showdown:
+          type: boolean
+          description: Always false for preflop
+        next_street:
+          type: boolean
+          description: Always false for preflop (no street transitions within preflop tree)
+        display_name:
+          type: string
+          description: "Human-readable label"
+          enum: [FOLD, RAISE, ALLIN, CALL]
+          example: "FOLD"
+        simple_group:
+          type: string
+          description: Simple grouping for UI
+          enum: [FOLD, RAISE, CALL]
+          example: "FOLD"
+        advanced_group:
+          type: string
+          description: Detailed grouping for UI
+          enum: [FOLD, BET_SMALL, BET_MEDIUM, BET_LARGE, BET_OVERBET, CALL]
+          example: "FOLD"
+        betsize_by_pot:
+          type: number
+          format: double
+          nullable: true
+          description: "Bet size as fraction of pot. null for fold/call."
+        next_position:
+          type: string
+          description: Position of the next player to act
+          example: "LJ"
+
+    Game:
+      type: object
+      description: Full game state at the current preflop decision point
+      required:
+        - players
+        - current_street
+        - pot
+        - active_position
+        - board
+        - bet_display_name
+      properties:
+        players:
+          type: array
+          description: |
+            All 9 seats at the table. Order starts from the active player's position
+            and wraps around. Includes folded players.
+          items:
+            $ref: '#/components/schemas/GamePlayer'
+        current_street:
+          $ref: '#/components/schemas/StreetInfo'
+        pot:
+          type: string
+          description: "Total pot size in BB (antes + blinds + any raises)"
+          example: "2.625"
+        pot_odds:
+          type: number
+          format: double
+          nullable: true
+          description: "Pot odds for the active player. Numeric value for preflop (e.g., 0.276)."
+        active_position:
+          type: string
+          description: Position of the player to act
+          example: "UTG+2"
+        board:
+          type: string
+          description: "Always empty string for preflop (no community cards yet)"
+          example: ""
+        bet_display_name:
+          type: string
+          description: "Always \"RAISE\" for preflop (no \"BET\" concept preflop)"
+          example: "RAISE"
+
+    StreetInfo:
+      type: object
+      required: [type, start_pot, end_pot]
+      properties:
+        type:
+          type: string
+          enum: [PREFLOP]
+          description: Always PREFLOP
+        start_pot:
+          type: string
+          description: Pot size at the start of preflop (antes + blinds)
+          example: "2.625"
+        end_pot:
+          type: string
+          description: Pot size including current preflop action
+          example: "2.625"
+
+    GamePlayer:
+      type: object
+      description: |
+        Player state at a table seat. In preflop, all 9 players appear.
+        Folded players have `is_folded: true` and `relative_postflop_position: null`.
+      required:
+        - position
+        - is_dealer
+        - is_folded
+        - is_hero
+        - is_active
+        - stack
+        - current_stack
+        - chips_on_table
+      properties:
+        relative_postflop_position:
+          type: string
+          nullable: true
+          description: |
+            "OOP" or "IP" for non-folded players, null for folded.
+            In preflop, multiple players can share "OOP". Only BTN is "IP".
+          enum: [OOP, IP]
+        hand:
+          type: string
+          nullable: true
+          description: Specific hand (null in solution mode)
+        is_dealer:
+          type: boolean
+          description: Whether this player is the dealer (BTN)
+        is_folded:
+          type: boolean
+          description: Whether this player has folded
+        is_hero:
+          type: boolean
+          description: Whether this is the hero (active decision maker)
+        is_active:
+          type: boolean
+          description: Whether it's this player's turn to act
+        stack:
+          type: string
+          description: Starting stack in BB
+          example: "20.125"
+        current_stack:
+          type: string
+          description: "Remaining stack (after posting blinds/antes)"
+          example: "20.000"
+        chips_on_table:
+          type: string
+          description: "Chips currently committed (0 for most, 0.5 for SB, 1.0 for BB)"
+          example: "0"
+        bounty:
+          type: string
+          nullable: true
+          description: Bounty amount (MTT bounty formats)
+        profile:
+          type: string
+          nullable: true
+          description: Player profile identifier
+        position:
+          type: string
+          description: Table position
+          enum: [BB, SB, BTN, CO, HJ, LJ, UTG+2, UTG+1, UTG]
+          example: "UTG+2"
+        bounty_in_bb:
+          type: string
+          nullable: true
+          description: Bounty expressed in big blinds
+
+    PlayerInfo:
+      type: object
+      description: |
+        Active player with preflop range. Only 1 entry for preflop
+        (the player currently making a decision).
+      required: [player, range]
+      properties:
+        player:
+          allOf:
+            - $ref: '#/components/schemas/GamePlayer'
+            - type: object
+              properties:
+                name:
+                  type: string
+                  description: Short display name (e.g., "UTG+2", "BTN")
+                  example: "UTG+2"
+                seat:
+                  type: integer
+                  description: Seat number (0-indexed)
+                  example: 2
+        range:
+          type: array
+          description: "Preflop range frequency for each hand group [0.0, 1.0]. Length: 169."
+          items:
+            type: number
+            format: double
