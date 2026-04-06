@@ -1,0 +1,23 @@
+# Solver data (large pre-computed files)
+/output
+
+# Rust build artifacts
+/api/target
+/target
+
+# Environment secrets
+/api/config/.env
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Cargo lock (optional - remove this line if you want to track it)
+# /api/Cargo.lock
